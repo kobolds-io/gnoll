@@ -29,8 +29,8 @@ pub fn build(b: *std.Build) void {
 
 fn setupLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
     const lib = b.addStaticLibrary(.{
-        .name = "hob",
-        .root_source_file = b.path("src/hob.zig"),
+        .name = "gnoll",
+        .root_source_file = b.path("src/gnoll.zig"),
         .target = target,
         .optimize = optimize,
         .version = version,
