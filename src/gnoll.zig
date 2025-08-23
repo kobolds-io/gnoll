@@ -83,9 +83,8 @@ pub const Gnoll = struct {
     }
 
     pub fn get(self: *Self, comptime T: type, key: []const u8) ?T {
-        var res: ?T = null;
         if (self.config.get(key)) |val| {
-            res = switch (val) {
+            return switch (val) {
                 .u8 => |v| if (T == u8) v else null,
                 .i32 => |v| if (T == i32) v else null,
                 .u32 => |v| if (T == u32) v else null,
@@ -94,10 +93,7 @@ pub const Gnoll = struct {
                 .f64 => |v| if (T == f64) v else null,
             };
         }
-
-        if (res == null) return self.getDefault(T, key);
-
-        return res;
+        return self.getDefault(T, key);
     }
 
     pub fn setDefault(self: *Self, key: []const u8, value: ConfigValue) !void {
@@ -235,24 +231,23 @@ test "read a config file" {
         .json,
     ));
 
-    for (gnoll.config_options.items) |config_option| {
-        std.debug.print("config_option {any}\n", .{config_option});
-    }
+    try testing.expectEqual(2, gnoll.config_options.items.len);
 
     try gnoll.set("u8", .{ .u8 = 123 });
     const u8_val = gnoll.get(u8, "u8").?;
-    std.debug.print("u8_val {}\n", .{u8_val});
+
+    try testing.expectEqual(123, u8_val);
 
     try gnoll.set("str", .{ .str = "hello there" });
     const str_val = gnoll.get([]const u8, "str").?;
-    std.debug.print("str_val {s}\n", .{str_val});
+    try testing.expect(std.mem.eql(u8, "hello there", str_val));
 
-    try gnoll.setDefault("my_default", .{ .str = "hello there" });
-    const default_val = gnoll.get([]const u8, "my_default").?;
-    std.debug.print("default_val {s}\n", .{default_val});
+    try gnoll.setDefault("default", .{ .u32 = 54321 });
+    const default_val = gnoll.get(u32, "default").?;
+    try testing.expectEqual(54321, default_val);
 
-    try gnoll.setDefault("my_default_overridden", .{ .bool = false });
-    try gnoll.set("my_default_overridden", .{ .bool = true });
-    const default_val_overridden_val = gnoll.get(bool, "my_default_overridden").?;
-    std.debug.print("default_val_overriden_val {any}\n", .{default_val_overridden_val});
+    try gnoll.setDefault("default_overridden", .{ .bool = false });
+    try gnoll.set("default_overridden", .{ .bool = true });
+    const default_val_overridden_val = gnoll.get(bool, "default_overridden").?;
+    try testing.expectEqual(true, default_val_overridden_val);
 }
