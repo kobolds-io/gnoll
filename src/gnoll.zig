@@ -72,17 +72,41 @@ pub const Gnoll = struct {
         try self.config_options.append(option);
     }
 
-    pub fn set(self: *Self, key: []const u8, value: ConfigValue) !void {
-        switch (value) {
-            .str => {
-                const duped = try self.allocator.dupe(u8, value.str);
-                try self.config.put(key, .{ .str = duped });
+    pub fn set(self: *Self, comptime T: type, key: []const u8, value: T) !void {
+        const val_to_store: ConfigValue = switch (T) {
+            u8 => .{ .u8 = value },
+            i32 => .{ .i32 = value },
+            u32 => .{ .u32 = value },
+            bool => .{ .bool = value },
+            f64 => .{ .f64 = value },
+            []const u8 => blk: {
+                const duped = try self.allocator.dupe(u8, value);
+                break :blk .{ .str = duped };
             },
-            else => try self.config.put(key, value),
-        }
+            else => @compileError("Unsupported type in set()"),
+        };
+
+        try self.config.put(key, val_to_store);
     }
 
-    pub fn get(self: *Self, comptime T: type, key: []const u8) ?T {
+    pub fn setDefault(self: *Self, comptime T: type, key: []const u8, value: T) !void {
+        const val_to_store: ConfigValue = switch (T) {
+            u8 => .{ .u8 = value },
+            i32 => .{ .i32 = value },
+            u32 => .{ .u32 = value },
+            bool => .{ .bool = value },
+            f64 => .{ .f64 = value },
+            []const u8 => blk: {
+                const duped = try self.allocator.dupe(u8, value);
+                break :blk .{ .str = duped };
+            },
+            else => @compileError("Unsupported type in set()"),
+        };
+
+        try self.defaults.put(key, val_to_store);
+    }
+
+    pub fn getAs(self: *Self, comptime T: type, key: []const u8) ?T {
         if (self.config.get(key)) |val| {
             return switch (val) {
                 .u8 => |v| if (T == u8) v else null,
@@ -93,20 +117,10 @@ pub const Gnoll = struct {
                 .f64 => |v| if (T == f64) v else null,
             };
         }
-        return self.getDefault(T, key);
+        return self.getDefaultAs(T, key);
     }
 
-    pub fn setDefault(self: *Self, key: []const u8, value: ConfigValue) !void {
-        switch (value) {
-            .str => {
-                const duped = try self.allocator.dupe(u8, value.str);
-                try self.defaults.put(key, .{ .str = duped });
-            },
-            else => try self.defaults.put(key, value),
-        }
-    }
-
-    fn getDefault(self: *Self, comptime T: type, key: []const u8) ?T {
+    fn getDefaultAs(self: *Self, comptime T: type, key: []const u8) ?T {
         if (self.defaults.get(key)) |val| {
             return switch (val) {
                 .u8 => |v| if (T == u8) v else null,
@@ -233,21 +247,21 @@ test "read a config file" {
 
     try testing.expectEqual(2, gnoll.config_options.items.len);
 
-    try gnoll.set("u8", .{ .u8 = 123 });
-    const u8_val = gnoll.get(u8, "u8").?;
+    try gnoll.set(u8, "u8", 123);
+    const u8_val = gnoll.getAs(u8, "u8").?;
 
     try testing.expectEqual(123, u8_val);
 
-    try gnoll.set("str", .{ .str = "hello there" });
-    const str_val = gnoll.get([]const u8, "str").?;
+    try gnoll.set([]const u8, "str", "hello there");
+    const str_val = gnoll.getAs([]const u8, "str").?;
     try testing.expect(std.mem.eql(u8, "hello there", str_val));
 
-    try gnoll.setDefault("default", .{ .u32 = 54321 });
-    const default_val = gnoll.get(u32, "default").?;
+    try gnoll.setDefault(u32, "default", 54321);
+    const default_val = gnoll.getAs(u32, "default").?;
     try testing.expectEqual(54321, default_val);
 
-    try gnoll.setDefault("default_overridden", .{ .bool = false });
-    try gnoll.set("default_overridden", .{ .bool = true });
-    const default_val_overridden_val = gnoll.get(bool, "default_overridden").?;
+    try gnoll.setDefault(bool, "default_overridden", false);
+    try gnoll.set(bool, "default_overridden", true);
+    const default_val_overridden_val = gnoll.getAs(bool, "default_overridden").?;
     try testing.expectEqual(true, default_val_overridden_val);
 }
