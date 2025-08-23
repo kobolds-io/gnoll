@@ -22,6 +22,8 @@ pub fn build(b: *std.Build) void {
 
     setupTests(b, target, optimize);
 
+    setupDocs(b, target, optimize);
+
     // setupBenchmarks(b, target, optimize);
 
     // setupExamples(b, target, optimize);
@@ -37,6 +39,27 @@ fn setupLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     });
 
     b.installArtifact(lib);
+}
+
+fn setupDocs(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const lib = b.addStaticLibrary(.{
+        .name = "gnoll",
+        .root_source_file = b.path("src/gnoll.zig"),
+        .target = target,
+        .optimize = optimize,
+        .version = version,
+    });
+
+    b.installArtifact(lib);
+
+    const install_docs = b.addInstallDirectory(.{
+        .source_dir = lib.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "docs",
+    });
+
+    const docs_step = b.step("docs", "generate docs");
+    docs_step.dependOn(&install_docs.step);
 }
 
 fn setupTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
