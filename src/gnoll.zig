@@ -4,12 +4,19 @@ const assert = std.debug.assert;
 const posix = std.poxix;
 
 pub const ConfigValue = union(enum) {
-    u8: u8,
-    i32: i32,
-    u32: u32,
     bool: bool,
-    str: []const u8,
+    f32: f32,
     f64: f64,
+    i128: i128,
+    i16: i16,
+    i32: i32,
+    i64: i64,
+    str: []const u8,
+    u128: u128,
+    u16: u16,
+    u32: u32,
+    u64: u64,
+    u8: u8,
 };
 
 pub const Gnoll = struct {
@@ -74,28 +81,46 @@ pub const Gnoll = struct {
 
     pub fn set(self: *Self, comptime T: type, key: []const u8, value: T) !void {
         const val_to_store: ConfigValue = switch (T) {
-            u8 => .{ .u8 = value },
-            i32 => .{ .i32 = value },
-            u32 => .{ .u32 = value },
             bool => .{ .bool = value },
-            f64 => .{ .f64 = value },
             []const u8 => blk: {
                 const duped = try self.allocator.dupe(u8, value);
                 break :blk .{ .str = duped };
             },
+            f32 => .{ .f32 = value },
+            f64 => .{ .f64 = value },
+            i128 => .{ .i128 = value },
+            i16 => .{ .i16 = value },
+            i32 => .{ .i32 = value },
+            i64 => .{ .i64 = value },
+            u128 => .{ .u128 = value },
+            u16 => .{ .u16 = value },
+            u32 => .{ .u32 = value },
+            u64 => .{ .u64 = value },
+            u8 => .{ .u8 = value },
             else => @compileError("Unsupported type in set()"),
         };
 
+        std.debug.print("current config count {}, capacity: {}\n", .{
+            self.config.count(),
+            self.config.capacity(),
+        });
         try self.config.put(key, val_to_store);
     }
 
     pub fn setDefault(self: *Self, comptime T: type, key: []const u8, value: T) !void {
         const val_to_store: ConfigValue = switch (T) {
-            u8 => .{ .u8 = value },
-            i32 => .{ .i32 = value },
-            u32 => .{ .u32 = value },
             bool => .{ .bool = value },
+            f32 => .{ .f32 = value },
             f64 => .{ .f64 = value },
+            i128 => .{ .i128 = value },
+            i16 => .{ .i16 = value },
+            i32 => .{ .i32 = value },
+            i64 => .{ .i64 = value },
+            u128 => .{ .u128 = value },
+            u16 => .{ .u16 = value },
+            u32 => .{ .u32 = value },
+            u64 => .{ .u64 = value },
+            u8 => .{ .u8 = value },
             []const u8 => blk: {
                 const duped = try self.allocator.dupe(u8, value);
                 break :blk .{ .str = duped };
@@ -109,12 +134,19 @@ pub const Gnoll = struct {
     pub fn getAs(self: *Self, comptime T: type, key: []const u8) ?T {
         if (self.config.get(key)) |val| {
             return switch (val) {
-                .u8 => |v| if (T == u8) v else null,
-                .i32 => |v| if (T == i32) v else null,
-                .u32 => |v| if (T == u32) v else null,
                 .bool => |v| if (T == bool) v else null,
-                .str => |v| if (T == []const u8) v else null,
+                .f32 => |v| if (T == f32) v else null,
                 .f64 => |v| if (T == f64) v else null,
+                .i128 => |v| if (T == i128) v else null,
+                .i16 => |v| if (T == i16) v else null,
+                .i32 => |v| if (T == i32) v else null,
+                .i64 => |v| if (T == i64) v else null,
+                .str => |v| if (T == []const u8) v else null,
+                .u128 => |v| if (T == u128) v else null,
+                .u16 => |v| if (T == u16) v else null,
+                .u32 => |v| if (T == u32) v else null,
+                .u64 => |v| if (T == u64) v else null,
+                .u8 => |v| if (T == u8) v else null,
             };
         }
         return self.getDefaultAs(T, key);
@@ -123,12 +155,19 @@ pub const Gnoll = struct {
     fn getDefaultAs(self: *Self, comptime T: type, key: []const u8) ?T {
         if (self.defaults.get(key)) |val| {
             return switch (val) {
-                .u8 => |v| if (T == u8) v else null,
-                .i32 => |v| if (T == i32) v else null,
-                .u32 => |v| if (T == u32) v else null,
                 .bool => |v| if (T == bool) v else null,
-                .str => |v| if (T == []const u8) v else null,
+                .f32 => |v| if (T == f32) v else null,
                 .f64 => |v| if (T == f64) v else null,
+                .i128 => |v| if (T == i128) v else null,
+                .i16 => |v| if (T == i16) v else null,
+                .i32 => |v| if (T == i32) v else null,
+                .i64 => |v| if (T == i64) v else null,
+                .str => |v| if (T == []const u8) v else null,
+                .u128 => |v| if (T == u128) v else null,
+                .u16 => |v| if (T == u16) v else null,
+                .u32 => |v| if (T == u32) v else null,
+                .u64 => |v| if (T == u64) v else null,
+                .u8 => |v| if (T == u8) v else null,
             };
         }
         return null;
@@ -264,4 +303,68 @@ test "read a config file" {
     try gnoll.set(bool, "default_overridden", true);
     const default_val_overridden_val = gnoll.getAs(bool, "default_overridden").?;
     try testing.expectEqual(true, default_val_overridden_val);
+}
+
+test "casting" {
+    const allocator = testing.allocator;
+
+    const types = [_]type{
+        bool,
+        []const u8,
+        f32,
+        f64,
+        i128,
+        i16,
+        i32,
+        i64,
+        u128,
+        u16,
+        u32,
+        u64,
+        u8,
+    };
+
+    var gnoll = Gnoll.init(allocator, .{});
+    defer gnoll.deinit();
+
+    var tmp_key_buffer: [32]u8 = undefined;
+
+    inline for (0..types.len) |i| {
+        const T = types[i];
+        const key = try std.fmt.bufPrint(&tmp_key_buffer, "key_{}", .{i});
+
+        switch (T) {
+            u8, i16, u16, i32, u32, i64, u64, i128, u128 => {
+                std.debug.print("key {s} T: {any}\n", .{ key, T });
+                try gnoll.set(T, key, 1);
+
+                const v = gnoll.getAs(T, key).?;
+                std.debug.print("value {} T: {any}\n", .{ v, T });
+
+                try testing.expectEqual(1, v);
+            },
+            f32, f64 => {
+                std.debug.print("key {s} T: {any}\n", .{ key, T });
+                try gnoll.set(T, key, 1.0);
+                const v = gnoll.getAs(T, key).?;
+
+                try testing.expectEqual(1.0, v);
+            },
+            bool => {
+                std.debug.print("key {s} T: {any}\n", .{ key, T });
+                try gnoll.set(T, key, true);
+                const v = gnoll.getAs(T, key).?;
+
+                try testing.expectEqual(true, v);
+            },
+            []const u8 => {
+                std.debug.print("key {s} T: {any}\n", .{ key, T });
+                try gnoll.set(T, key, "hello there");
+                const v = gnoll.getAs(T, key).?;
+
+                try testing.expect(std.mem.eql(u8, "hello there", v));
+            },
+            else => unreachable,
+        }
+    }
 }
