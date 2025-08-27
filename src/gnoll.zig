@@ -311,4 +311,9 @@ test "read json config file" {
 
     var gnoll = Gnoll.init(allocator, .{});
     defer gnoll.deinit();
+
+    // const config = try gnoll.getConfig();
+    // const my_bool = config.get(bool, "my.bool", false);
+    // cosnt my_bytes = config.get([]const u8, "my.string", "hello");
+
 }
