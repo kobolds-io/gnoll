@@ -24,7 +24,7 @@ pub const Gnoll = struct {
 
     allocator: std.mem.Allocator,
     options: GnollOptions,
-    config_options: std.ArrayList(ConfigOption),
+    config_options: std.array_list.Managed(ConfigOption),
     config: std.StringHashMap(ConfigValue),
     defaults: std.StringHashMap(ConfigValue),
 
@@ -32,7 +32,7 @@ pub const Gnoll = struct {
         return Self{
             .allocator = allocator,
             .options = options,
-            .config_options = std.ArrayList(ConfigOption).init(allocator),
+            .config_options = std.array_list.Managed(ConfigOption).init(allocator),
             .config = std.StringHashMap(ConfigValue).init(allocator),
             .defaults = std.StringHashMap(ConfigValue).init(allocator),
         };
