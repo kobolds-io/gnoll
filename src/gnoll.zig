@@ -101,7 +101,7 @@ pub const Gnoll = struct {
             else => @compileError("Unsupported type in set()"),
         };
 
-        std.debug.print("current config count {d}, capacity: {d}\n", .{
+        log.debug("current config count {d}, capacity: {d}\n", .{
             self.config.count(),
             self.config.capacity(),
         });
@@ -176,7 +176,7 @@ pub const Gnoll = struct {
 
     fn readFile(self: *Self, path: []const u8) !void {
         const file = std.fs.cwd().openFile(path, .{}) catch |err| {
-            std.debug.print("File '{s}' does not exist\n", .{path});
+            log.err("File '{s}' does not exist\n", .{path});
             return err;
         };
         defer file.close();
@@ -197,14 +197,14 @@ pub const Gnoll = struct {
     fn checkFileExists(self: *Self, config_option: ConfigOption) bool {
         _ = self;
 
-        std.debug.print("checking path {s}\n", .{config_option.path});
+        log.debug("checking path {s}\n", .{config_option.path});
         _ = std.fs.cwd().statFile(config_option.path) catch |err| switch (err) {
             error.FileNotFound => {
-                std.debug.print("File '{s}' does not exist\n", .{config_option.path});
+                log.err("File '{s}' does not exist\n", .{config_option.path});
                 return false;
             },
             else => {
-                std.debug.print("File '{s}' could not be checked. {any}\n", .{
+                log.err("File '{s}' could not be checked. {any}\n", .{
                     config_option.path,
                     err,
                 });
@@ -219,7 +219,7 @@ pub const Gnoll = struct {
         const config_option = try self.findValidConfigOption();
 
         const file = std.fs.cwd().openFile(config_option.path, .{}) catch |err| {
-            std.debug.print("File '{s}' does not exist\n", .{config_option.path});
+            log.err("File '{s}' does not exist\n", .{config_option.path});
             return err;
         };
         defer file.close();
@@ -304,4 +304,11 @@ test "read a config file" {
     try gnoll.set(bool, "default_overridden", true);
     const default_val_overridden_val = gnoll.getAs(bool, "default_overridden").?;
     try testing.expectEqual(true, default_val_overridden_val);
+}
+
+test "read json config file" {
+    const allocator = testing.allocator;
+
+    var gnoll = Gnoll.init(allocator, .{});
+    defer gnoll.deinit();
 }
