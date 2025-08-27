@@ -3,6 +3,7 @@ const testing = std.testing;
 const assert = std.debug.assert;
 const posix = std.poxix;
 const log = std.log.scoped(.Gnoll);
+const json = std.json;
 
 pub const ConfigValue = union(enum) {
     bool: bool,
@@ -27,7 +28,6 @@ pub const Gnoll = struct {
     options: GnollOptions,
     config_options: std.ArrayList(ConfigOption),
     config: std.StringHashMapUnmanaged(ConfigValue),
-    defaults: std.StringHashMapUnmanaged(ConfigValue),
 
     pub fn init(allocator: std.mem.Allocator, options: GnollOptions) Self {
         return Self{
@@ -35,7 +35,6 @@ pub const Gnoll = struct {
             .options = options,
             .config_options = .empty,
             .config = .empty,
-            .defaults = .empty,
         };
     }
 
@@ -52,17 +51,6 @@ pub const Gnoll = struct {
             }
         }
         self.config.deinit(self.allocator);
-
-        var defaults_iter = self.defaults.valueIterator();
-        while (defaults_iter.next()) |entry| {
-            const value = entry.*;
-
-            switch (value) {
-                .bytes => |s| self.allocator.free(s),
-                else => {},
-            }
-        }
-        self.defaults.deinit(self.allocator);
     }
 
     pub fn addConfigOption(self: *Self, filepath: []const u8, config_type: ConfigType) !void {
@@ -108,53 +96,8 @@ pub const Gnoll = struct {
         try self.config.put(self.allocator, key, val_to_store);
     }
 
-    pub fn setDefault(self: *Self, comptime T: type, key: []const u8, value: T) !void {
-        const val_to_store: ConfigValue = switch (T) {
-            bool => .{ .bool = value },
-            f32 => .{ .f32 = value },
-            f64 => .{ .f64 = value },
-            i128 => .{ .i128 = value },
-            i16 => .{ .i16 = value },
-            i32 => .{ .i32 = value },
-            i64 => .{ .i64 = value },
-            u128 => .{ .u128 = value },
-            u16 => .{ .u16 = value },
-            u32 => .{ .u32 = value },
-            u64 => .{ .u64 = value },
-            u8 => .{ .u8 = value },
-            []const u8 => blk: {
-                const duped = try self.allocator.dupe(u8, value);
-                break :blk .{ .bytes = duped };
-            },
-            else => @compileError("Unsupported type in set()"),
-        };
-
-        try self.defaults.put(self.allocator, key, val_to_store);
-    }
-
     pub fn getAs(self: *Self, comptime T: type, key: []const u8) ?T {
         if (self.config.get(key)) |val| {
-            return switch (val) {
-                .bool => |v| if (T == bool) v else null,
-                .f32 => |v| if (T == f32) v else null,
-                .f64 => |v| if (T == f64) v else null,
-                .i128 => |v| if (T == i128) v else null,
-                .i16 => |v| if (T == i16) v else null,
-                .i32 => |v| if (T == i32) v else null,
-                .i64 => |v| if (T == i64) v else null,
-                .bytes => |v| if (T == []const u8) v else null,
-                .u128 => |v| if (T == u128) v else null,
-                .u16 => |v| if (T == u16) v else null,
-                .u32 => |v| if (T == u32) v else null,
-                .u64 => |v| if (T == u64) v else null,
-                .u8 => |v| if (T == u8) v else null,
-            };
-        }
-        return self.getDefaultAs(T, key);
-    }
-
-    fn getDefaultAs(self: *Self, comptime T: type, key: []const u8) ?T {
-        if (self.defaults.get(key)) |val| {
             return switch (val) {
                 .bool => |v| if (T == bool) v else null,
                 .f32 => |v| if (T == f32) v else null,
@@ -215,7 +158,7 @@ pub const Gnoll = struct {
         return true;
     }
 
-    fn getConfigFile(self: *Self) !void {
+    pub fn getConfig(self: *Self) !void {
         const config_option = try self.findValidConfigOption();
 
         const file = std.fs.cwd().openFile(config_option.path, .{}) catch |err| {
@@ -228,13 +171,29 @@ pub const Gnoll = struct {
         const file_size = stat.size;
 
         const config_buf = try self.allocator.alloc(u8, file_size);
-        errdefer self.allocator.free(config_buf);
+        defer self.allocator.free(config_buf);
 
         const n = try file.readAll(config_buf);
 
         if (n != file_size) return error.UnexepectedFileReadError;
 
-        self.config = config_buf;
+        const T = struct {
+            key0: []const u8,
+            key1: struct {
+                nested: u32,
+            },
+        };
+
+        return switch (config_option.config_type) {
+            .json => {
+                const parsed: json.Parsed(T) = try json.parseFromSlice(T, self.allocator, config_buf, .{ .ignore_unknown_fields = false });
+                defer parsed.deinit();
+
+                log.warn("t was parsed {any}", .{parsed.value});
+            },
+        };
+
+        // self.config = config_buf;
     }
 
     fn findValidConfigOption(self: *Self) !ConfigOption {
@@ -259,6 +218,10 @@ pub const ConfigOption = struct {
 };
 
 pub const GnollOptions = struct {};
+
+pub const Config = struct {
+    data: std.StringHashMapUnmanaged(ConfigValue),
+};
 
 pub const ConfigType = enum {
     json,
@@ -295,15 +258,6 @@ test "read a config file" {
     try gnoll.set([]const u8, "bytes", "hello there");
     const bytes_val = gnoll.getAs([]const u8, "bytes").?;
     try testing.expect(std.mem.eql(u8, "hello there", bytes_val));
-
-    try gnoll.setDefault(u32, "default", 54321);
-    const default_val = gnoll.getAs(u32, "default").?;
-    try testing.expectEqual(54321, default_val);
-
-    try gnoll.setDefault(bool, "default_overridden", false);
-    try gnoll.set(bool, "default_overridden", true);
-    const default_val_overridden_val = gnoll.getAs(bool, "default_overridden").?;
-    try testing.expectEqual(true, default_val_overridden_val);
 }
 
 test "read json config file" {
@@ -312,7 +266,10 @@ test "read json config file" {
     var gnoll = Gnoll.init(allocator, .{});
     defer gnoll.deinit();
 
-    // const config = try gnoll.getConfig();
+    try gnoll.addConfigOption("./test_data/config_0.json", .json);
+
+    const config = try gnoll.getConfig();
+    log.info("config {any}", .{config});
     // const my_bool = config.get(bool, "my.bool", false);
     // cosnt my_bytes = config.get([]const u8, "my.string", "hello");
 

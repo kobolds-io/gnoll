@@ -1,4 +1,6 @@
 {
-  "key": "string value",
-  0: 12345,
+  "key0": "some bytes value",
+  "key1": {
+    "nested": 123456
+  }
 }
