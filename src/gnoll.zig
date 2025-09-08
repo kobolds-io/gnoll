@@ -235,9 +235,11 @@ pub const GnollOptions = struct {};
 pub const Untyped = struct {};
 
 pub fn Gnoll(comptime T: type) type {
-    _ = T;
     return struct {
         const Self = @This();
+
+        /// A type to handle the parsed config file and adds some helpful accessor methods
+        pub const Config = ConfigT(T);
 
         options: GnollOptions,
         candidates: std.ArrayList(ConfigFileCandidate),
@@ -254,7 +256,7 @@ pub fn Gnoll(comptime T: type) type {
             self.candidates.deinit(allocator);
         }
 
-        pub fn addConfigFileCandidate(
+        pub fn addConfigCandidate(
             self: *Self,
             allocator: std.mem.Allocator,
             filepath: []const u8,
@@ -267,19 +269,29 @@ pub fn Gnoll(comptime T: type) type {
                 .config_format = format,
             };
 
-            for (self.candidates.items) |candidates| {
-                if (candidates.eql(candidate)) return error.DuplicateConfigOption;
-            }
+            for (self.candidates.items) |candidates| if (candidates.eql(candidate)) return error.DuplicateConfigOption;
 
             try self.candidates.append(allocator, candidate);
         }
+
+        pub fn readConfig(self: *Self, allocator: std.mem.Allocator) !Config {
+            _ = self;
+            _ = allocator;
+
+            return Config{};
+        }
     };
+}
+
+fn ConfigT(comptime T: type) type {
+    _ = T;
+    return struct {};
 }
 
 test "basic workflow" {
     const allocator = testing.allocator;
 
-    const ConfigT = struct {
+    const MyConfigFileType = struct {
         key_0: u32,
         key_1: []const u8,
         key_2: struct {
@@ -287,15 +299,18 @@ test "basic workflow" {
         },
     };
 
-    var gnoll = Gnoll(ConfigT).init(allocator, .{});
+    var gnoll = Gnoll(MyConfigFileType).init(allocator, .{});
     defer gnoll.deinit(allocator);
 
     try testing.expectEqual(0, gnoll.candidates.items.len);
 
-    try gnoll.addConfigFileCandidate(allocator, "./test_data/config_0.json", .json);
-    try gnoll.addConfigFileCandidate(allocator, "./test_data/config_1.json", .json);
+    try gnoll.addConfigCandidate(allocator, "./test_data/config_0.json", .json);
+    try gnoll.addConfigCandidate(allocator, "./test_data/config_1.json", .json);
 
     try testing.expectEqual(2, gnoll.candidates.items.len);
+
+    const config = try gnoll.readConfig(allocator);
+    log.err("read config {any}", .{config});
 
     // const config = try gnoll.getConfig();
     // log.info("config {any}", .{config});
