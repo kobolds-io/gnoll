@@ -24,6 +24,7 @@ const ConfigInfo = struct {
 
 pub const GnollOptions = struct {
     config_infos: []const ConfigInfo = &.{},
+    ignore_unknown_fields: bool = false,
 
     pub fn validate(self: GnollOptions) !void {
         if (self.config_infos.len == 0) return error.MissingConfigInfo;
@@ -73,53 +74,16 @@ pub fn Gnoll(comptime T: type) type {
     return struct {
         const Self = @This();
 
-        const Config = struct {
-            config_info: ConfigInfo,
-            parsed: *anyopaque,
-            parsed_type: type,
-
-            pub fn init(comptime parsed_type: type, parsed: *anyopaque, config_info: ConfigInfo) Config {
-                return Config{
-                    .parsed_type = parsed_type,
-                    .parsed = parsed,
-                    .config_info = config_info,
-                };
-            }
-        };
-
-        // config: Config,
+        config_info: ConfigInfo,
+        config: T,
+        parsed_ptr: *anyopaque,
+        source_buf: []u8,
 
         pub fn init(allocator: std.mem.Allocator, options: GnollOptions) !Self {
             try options.validate();
             const config_info = try options.getConfigInfo();
 
-            log.err("config_info {any}", .{config_info});
-
-            _ = allocator;
-            // try Gnoll.validateOptions(options);
-            // const config_info = try Gnoll.getConfigInfo(options);
-
-            // const config = try Gnoll.readConfig(T, allocator, config_info);
-            // errdefer config.deinit();
-
-            // const config = try options.parse(allocator, config_info);
-            // errdefer allocator.destroy(config);
-
-            return Self{
-                // .allocator = allocator,
-                // .gnoll_config = options,
-                // .config_info = config_info,
-                // .config = Config,
-            };
-        }
-
-        pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
-            _ = self;
-            _ = allocator;
-            // self.config_candidates.deinit(self.allocator);
-        }
-
-        fn readConfig(allocator: std.mem.Allocator, config_info: ConfigInfo) !Config {
+            // read the file
             // figure out if the file exists or return an error
             const file = std.fs.cwd().openFile(config_info.filepath, .{}) catch |err| {
                 log.err("File '{s}' does not exist\n", .{config_info.filepath});
@@ -131,30 +95,49 @@ pub fn Gnoll(comptime T: type) type {
             const file_size = stat.size;
 
             const buf = try allocator.alloc(u8, file_size);
-            defer allocator.free(buf);
+            errdefer allocator.free(buf);
 
             const n = try file.readAll(buf);
 
             if (n != file_size) return error.UnexepectedFileReadError;
 
-            // figure out how to parse this config
-            // if this is a json config
             switch (config_info.format) {
                 .json => {
-                    const parsed: json.Parsed(T) = try json.parseFromSlice(T, allocator, buf, .{});
+                    const parsed: json.Parsed(T) = try json.parseFromSlice(
+                        T,
+                        allocator,
+                        buf,
+                        .{ .ignore_unknown_fields = options.ignore_unknown_fields },
+                    );
                     errdefer parsed.deinit();
 
-                    return Config.init(json.Parsed(T), parsed, parsed.value);
+                    const parsed_ptr = try allocator.create(json.Parsed(T));
+                    errdefer allocator.destroy(parsed_ptr);
 
-                    // return Config{
-                    //     .parsed = parsed,
-                    //     .value = parsed.value,
-                    // };
+                    parsed_ptr.* = parsed;
+
+                    return Self{
+                        .config_info = config_info,
+                        .parsed_ptr = parsed_ptr,
+                        .config = parsed.value,
+                        .source_buf = buf,
+                    };
                 },
                 else => unreachable,
             }
+        }
 
-            // return Config{};
+        pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
+            switch (self.config_info.format) {
+                .json => {
+                    const parsed_ptr: *json.Parsed(T) = @ptrCast(@alignCast(self.parsed_ptr));
+                    parsed_ptr.deinit();
+
+                    allocator.free(self.source_buf);
+                    allocator.destroy(parsed_ptr);
+                },
+                else => unreachable,
+            }
         }
     };
 }
@@ -171,6 +154,7 @@ test "basic workflow" {
     };
 
     const gnoll_options = GnollOptions{
+        .ignore_unknown_fields = false,
         .config_infos = &.{
             ConfigInfo{
                 .filepath = "./test_data/config_0.json",
@@ -186,23 +170,8 @@ test "basic workflow" {
     var gnoll = try Gnoll(MyConfigFileType).init(allocator, gnoll_options);
     defer gnoll.deinit(allocator);
 
-    // try testing.expectEqual(0, gnoll.config_candidates.items.len);
-
-    // try gnoll.addConfigInfo(allocator, "./test_data/config_0.json", .json);
-    // try gnoll.addConfigInfo(allocator, "./test_data/config_1.yaml", .yaml);
-
-    // try testing.expectEqual(2, gnoll.config_candidates.items.len);
-
-    // const config = try gnoll.readConfig();
-    // defer config.deinit();
-
-    // const config = try gnoll.readConfig(MyConfigFileType, allocator);
-
-    // const config = try gnoll.readConfig(MyConfigFileType, allocator);
-    // log.err("read config {any}", .{config});
-
-    // const config = try gnoll.getConfig();
-    // log.info("config {any}", .{config});
-    // const my_bool = config.get(bool, "my.bool", false);
-    // cosnt my_bytes = config.get([]const u8, "my.string", "hello");
+    log.err("gnoll.config {any}", .{gnoll.config});
+    log.err("gnoll.config.key_0 {d}", .{gnoll.config.key_0});
+    log.err("gnoll.config.key_1 {s}", .{gnoll.config.key_1});
+    log.err("gnoll.config.key_2 {any}", .{gnoll.config.key_2.key_0});
 }

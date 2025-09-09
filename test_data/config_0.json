@@ -1,6 +1,6 @@
 {
   "key_0": 54321,
-  "key_1": "some bytes value"
+  "key_1": "some bytes value",
   "key_2": {
     "key_0": [1.23, 3.14]
   }
