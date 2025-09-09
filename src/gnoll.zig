@@ -233,7 +233,7 @@ test "file not found" {
         .ignore_unknown_fields = false,
         .config_infos = &.{
             ConfigInfo{
-                .filepath = "bullshit",
+                .filepath = "/tmp/bullshitfile",
                 .format = .json,
             },
         },
