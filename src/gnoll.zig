@@ -156,11 +156,11 @@ test "basic workflow" {
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
         .config_infos = &.{
-            ConfigInfo{
+            .{
                 .filepath = "./test_data/config_0.json",
                 .format = .json,
             },
-            ConfigInfo{
+            .{
                 .filepath = "./test_data/config_1.yaml",
                 .format = .yaml,
             },
@@ -170,8 +170,7 @@ test "basic workflow" {
     var gnoll = try Gnoll(MyConfigFileType).init(allocator, gnoll_options);
     defer gnoll.deinit(allocator);
 
-    log.err("gnoll.config {any}", .{gnoll.config});
-    log.err("gnoll.config.key_0 {d}", .{gnoll.config.key_0});
-    log.err("gnoll.config.key_1 {s}", .{gnoll.config.key_1});
-    log.err("gnoll.config.key_2 {any}", .{gnoll.config.key_2.key_0});
+    try testing.expectEqual(54321, gnoll.config.key_0);
+    try testing.expect(std.mem.eql(u8, "some bytes value", gnoll.config.key_1));
+    try testing.expect(std.mem.eql(f32, &.{ 1.23, 3.14 }, gnoll.config.key_2.key_0));
 }
