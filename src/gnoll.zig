@@ -49,7 +49,6 @@ pub const GnollOptions = struct {
             log.debug("checking path {s}\n", .{candidate.filepath});
             _ = std.fs.cwd().statFile(candidate.filepath) catch |err| switch (err) {
                 error.FileNotFound => {
-                    log.err("File '{s}' does not exist\n", .{candidate.filepath});
                     continue;
                 },
                 else => {
@@ -85,10 +84,7 @@ pub fn Gnoll(comptime T: type) type {
 
             // read the file
             // figure out if the file exists or return an error
-            const file = std.fs.cwd().openFile(config_info.filepath, .{}) catch |err| {
-                log.err("File '{s}' does not exist\n", .{config_info.filepath});
-                return err;
-            };
+            const file = try std.fs.cwd().openFile(config_info.filepath, .{});
             defer file.close();
 
             const stat = try file.stat();
@@ -156,11 +152,11 @@ test "basic workflow" {
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
         .config_infos = &.{
-            .{
+            ConfigInfo{
                 .filepath = "./test_data/config_0.json",
                 .format = .json,
             },
-            .{
+            ConfigInfo{
                 .filepath = "./test_data/config_1.yaml",
                 .format = .yaml,
             },
@@ -173,4 +169,75 @@ test "basic workflow" {
     try testing.expectEqual(54321, gnoll.config.key_0);
     try testing.expect(std.mem.eql(u8, "some bytes value", gnoll.config.key_1));
     try testing.expect(std.mem.eql(f32, &.{ 1.23, 3.14 }, gnoll.config.key_2.key_0));
+}
+
+test "error on duplicate config" {
+    const allocator = testing.allocator;
+
+    const MyConfigFileType = struct {
+        key_0: u32,
+        key_1: []const u8,
+        key_2: struct {
+            key_0: []f32,
+        },
+    };
+
+    const gnoll_options = GnollOptions{
+        .ignore_unknown_fields = false,
+        .config_infos = &.{
+            ConfigInfo{
+                .filepath = "./test_data/config_0.json",
+                .format = .json,
+            },
+            ConfigInfo{
+                .filepath = "./test_data/config_0.json",
+                .format = .json,
+            },
+        },
+    };
+
+    try testing.expectError(error.DuplicateConfigInfo, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+}
+
+test "error no config info" {
+    const allocator = testing.allocator;
+
+    const MyConfigFileType = struct {
+        key_0: u32,
+        key_1: []const u8,
+        key_2: struct {
+            key_0: []f32,
+        },
+    };
+
+    const gnoll_options = GnollOptions{
+        .ignore_unknown_fields = false,
+        .config_infos = &.{},
+    };
+
+    try testing.expectError(error.MissingConfigInfo, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+}
+
+test "file not found" {
+    const allocator = testing.allocator;
+
+    const MyConfigFileType = struct {
+        key_0: u32,
+        key_1: []const u8,
+        key_2: struct {
+            key_0: []f32,
+        },
+    };
+
+    const gnoll_options = GnollOptions{
+        .ignore_unknown_fields = false,
+        .config_infos = &.{
+            ConfigInfo{
+                .filepath = "bullshit",
+                .format = .json,
+            },
+        },
+    };
+
+    try testing.expectError(error.NoEligibleConfigInfoFound, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
 }
