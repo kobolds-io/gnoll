@@ -138,16 +138,16 @@ pub fn Gnoll(comptime T: type) type {
     };
 }
 
+const TestConfig = struct {
+    key_0: u32,
+    key_1: []const u8,
+    key_2: struct {
+        key_0: []f32,
+    },
+};
+
 test "basic workflow" {
     const allocator = testing.allocator;
-
-    const MyConfigFileType = struct {
-        key_0: u32,
-        key_1: []const u8,
-        key_2: struct {
-            key_0: []f32,
-        },
-    };
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -163,7 +163,7 @@ test "basic workflow" {
         },
     };
 
-    var gnoll = try Gnoll(MyConfigFileType).init(allocator, gnoll_options);
+    var gnoll = try Gnoll(TestConfig).init(allocator, gnoll_options);
     defer gnoll.deinit(allocator);
 
     try testing.expectEqual(54321, gnoll.config.key_0);
@@ -173,14 +173,6 @@ test "basic workflow" {
 
 test "error on duplicate config" {
     const allocator = testing.allocator;
-
-    const MyConfigFileType = struct {
-        key_0: u32,
-        key_1: []const u8,
-        key_2: struct {
-            key_0: []f32,
-        },
-    };
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -196,38 +188,22 @@ test "error on duplicate config" {
         },
     };
 
-    try testing.expectError(error.DuplicateConfigInfo, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+    try testing.expectError(error.DuplicateConfigInfo, Gnoll(TestConfig).init(allocator, gnoll_options));
 }
 
 test "error no config info" {
     const allocator = testing.allocator;
-
-    const MyConfigFileType = struct {
-        key_0: u32,
-        key_1: []const u8,
-        key_2: struct {
-            key_0: []f32,
-        },
-    };
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
         .config_infos = &.{},
     };
 
-    try testing.expectError(error.MissingConfigInfo, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+    try testing.expectError(error.MissingConfigInfo, Gnoll(TestConfig).init(allocator, gnoll_options));
 }
 
 test "file not found" {
     const allocator = testing.allocator;
-
-    const MyConfigFileType = struct {
-        key_0: u32,
-        key_1: []const u8,
-        key_2: struct {
-            key_0: []f32,
-        },
-    };
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -239,19 +215,11 @@ test "file not found" {
         },
     };
 
-    try testing.expectError(error.NoEligibleConfigInfoFound, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+    try testing.expectError(error.NoEligibleConfigInfoFound, Gnoll(TestConfig).init(allocator, gnoll_options));
 }
 
 test "error on invalid parsing of file" {
     const allocator = testing.allocator;
-
-    const MyConfigFileType = struct {
-        key_0: u32,
-        key_1: []const u8,
-        key_2: struct {
-            key_0: []f32,
-        },
-    };
 
     // Using a yaml file that is not json
     const gnoll_options = GnollOptions{
@@ -264,5 +232,5 @@ test "error on invalid parsing of file" {
         },
     };
 
-    try testing.expectError(error.SyntaxError, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+    try testing.expectError(error.SyntaxError, Gnoll(TestConfig).init(allocator, gnoll_options));
 }
