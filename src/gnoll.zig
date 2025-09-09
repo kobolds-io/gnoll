@@ -241,3 +241,28 @@ test "file not found" {
 
     try testing.expectError(error.NoEligibleConfigInfoFound, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
 }
+
+test "error on invalid parsing of file" {
+    const allocator = testing.allocator;
+
+    const MyConfigFileType = struct {
+        key_0: u32,
+        key_1: []const u8,
+        key_2: struct {
+            key_0: []f32,
+        },
+    };
+
+    // Using a yaml file that is not json
+    const gnoll_options = GnollOptions{
+        .ignore_unknown_fields = false,
+        .config_infos = &.{
+            ConfigInfo{
+                .filepath = "./test_data/config_1.yaml",
+                .format = .json,
+            },
+        },
+    };
+
+    try testing.expectError(error.SyntaxError, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+}
