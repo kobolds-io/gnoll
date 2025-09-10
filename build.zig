@@ -42,6 +42,12 @@ fn setupLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
 
     lib.root_module.addImport("yaml", yaml_mod);
 
+    _ = b.addModule("gnoll", .{
+        .root_source_file = b.path("src/gnoll.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     b.installArtifact(lib);
 }
 
