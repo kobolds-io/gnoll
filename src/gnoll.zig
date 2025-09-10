@@ -1,9 +1,11 @@
 const std = @import("std");
-const testing = std.testing;
+const Yaml = @import("yaml").Yaml;
+
 const assert = std.debug.assert;
-const posix = std.poxix;
-const log = std.log.scoped(.Gnoll);
 const json = std.json;
+const log = std.log.scoped(.Gnoll);
+const posix = std.poxix;
+const testing = std.testing;
 
 const ConfigFormat = enum {
     json,
@@ -119,7 +121,27 @@ pub fn Gnoll(comptime T: type) type {
                         .source_buf = buf,
                     };
                 },
-                else => unreachable,
+                .yaml => {
+                    const yaml = try allocator.create(Yaml);
+                    errdefer allocator.destroy(yaml);
+
+                    yaml.* = .{ .source = buf };
+                    errdefer yaml.deinit(allocator);
+
+                    try yaml.load(allocator);
+
+                    var arena = std.heap.ArenaAllocator.init(allocator);
+                    defer arena.deinit();
+
+                    const parsed = try yaml.parse(arena.allocator(), T);
+
+                    return Self{
+                        .config_info = config_info,
+                        .parsed_ptr = yaml,
+                        .config = parsed,
+                        .source_buf = buf,
+                    };
+                },
             }
         }
 
@@ -132,22 +154,28 @@ pub fn Gnoll(comptime T: type) type {
                     allocator.free(self.source_buf);
                     allocator.destroy(parsed_ptr);
                 },
-                else => unreachable,
+                .yaml => {
+                    const parsed_ptr: *Yaml = @ptrCast(@alignCast(self.parsed_ptr));
+                    parsed_ptr.deinit(allocator);
+
+                    allocator.free(self.source_buf);
+                    allocator.destroy(parsed_ptr);
+                },
             }
         }
     };
 }
 
+const TestConfig = struct {
+    key_0: u32,
+    key_1: []const u8,
+    key_2: struct {
+        key_0: []f32,
+    },
+};
+
 test "basic workflow" {
     const allocator = testing.allocator;
-
-    const MyConfigFileType = struct {
-        key_0: u32,
-        key_1: []const u8,
-        key_2: struct {
-            key_0: []f32,
-        },
-    };
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -163,7 +191,52 @@ test "basic workflow" {
         },
     };
 
-    var gnoll = try Gnoll(MyConfigFileType).init(allocator, gnoll_options);
+    var gnoll = try Gnoll(TestConfig).init(allocator, gnoll_options);
+    defer gnoll.deinit(allocator);
+
+    try testing.expectEqual(gnoll_options.config_infos[0].filepath, gnoll.config_info.filepath);
+    try testing.expectEqual(gnoll_options.config_infos[0].format, gnoll.config_info.format);
+
+    try testing.expectEqual(54321, gnoll.config.key_0);
+    try testing.expect(std.mem.eql(u8, "some bytes value", gnoll.config.key_1));
+    try testing.expect(std.mem.eql(f32, &.{ 1.23, 3.14 }, gnoll.config.key_2.key_0));
+}
+
+test "json support" {
+    const allocator = testing.allocator;
+
+    const gnoll_options = GnollOptions{
+        .ignore_unknown_fields = false,
+        .config_infos = &.{
+            ConfigInfo{
+                .filepath = "./test_data/config_0.json",
+                .format = .json,
+            },
+        },
+    };
+
+    var gnoll = try Gnoll(TestConfig).init(allocator, gnoll_options);
+    defer gnoll.deinit(allocator);
+
+    try testing.expectEqual(54321, gnoll.config.key_0);
+    try testing.expect(std.mem.eql(u8, "some bytes value", gnoll.config.key_1));
+    try testing.expect(std.mem.eql(f32, &.{ 1.23, 3.14 }, gnoll.config.key_2.key_0));
+}
+
+test "yaml support" {
+    const allocator = testing.allocator;
+
+    const gnoll_options = GnollOptions{
+        .ignore_unknown_fields = false,
+        .config_infos = &.{
+            ConfigInfo{
+                .filepath = "./test_data/config_1.yaml",
+                .format = .yaml,
+            },
+        },
+    };
+
+    var gnoll = try Gnoll(TestConfig).init(allocator, gnoll_options);
     defer gnoll.deinit(allocator);
 
     try testing.expectEqual(54321, gnoll.config.key_0);
@@ -173,14 +246,6 @@ test "basic workflow" {
 
 test "error on duplicate config" {
     const allocator = testing.allocator;
-
-    const MyConfigFileType = struct {
-        key_0: u32,
-        key_1: []const u8,
-        key_2: struct {
-            key_0: []f32,
-        },
-    };
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -196,38 +261,22 @@ test "error on duplicate config" {
         },
     };
 
-    try testing.expectError(error.DuplicateConfigInfo, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+    try testing.expectError(error.DuplicateConfigInfo, Gnoll(TestConfig).init(allocator, gnoll_options));
 }
 
 test "error no config info" {
     const allocator = testing.allocator;
-
-    const MyConfigFileType = struct {
-        key_0: u32,
-        key_1: []const u8,
-        key_2: struct {
-            key_0: []f32,
-        },
-    };
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
         .config_infos = &.{},
     };
 
-    try testing.expectError(error.MissingConfigInfo, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+    try testing.expectError(error.MissingConfigInfo, Gnoll(TestConfig).init(allocator, gnoll_options));
 }
 
 test "file not found" {
     const allocator = testing.allocator;
-
-    const MyConfigFileType = struct {
-        key_0: u32,
-        key_1: []const u8,
-        key_2: struct {
-            key_0: []f32,
-        },
-    };
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -239,5 +288,21 @@ test "file not found" {
         },
     };
 
-    try testing.expectError(error.NoEligibleConfigInfoFound, Gnoll(MyConfigFileType).init(allocator, gnoll_options));
+    try testing.expectError(error.NoEligibleConfigInfoFound, Gnoll(TestConfig).init(allocator, gnoll_options));
+}
+
+test "file parse error" {
+    const allocator = testing.allocator;
+
+    const gnoll_options = GnollOptions{
+        .ignore_unknown_fields = false,
+        .config_infos = &.{
+            ConfigInfo{
+                .filepath = "./test_data/config_1.yaml",
+                .format = .json,
+            },
+        },
+    };
+
+    try testing.expectError(error.SyntaxError, Gnoll(TestConfig).init(allocator, gnoll_options));
 }

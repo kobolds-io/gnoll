@@ -40,6 +40,14 @@ fn setupLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
         .version = version,
     });
 
+    const yaml_dep = b.dependency("yaml", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const yaml_mod = yaml_dep.module("yaml");
+
+    lib.root_module.addImport("yaml", yaml_mod);
+
     b.installArtifact(lib);
 }
 
@@ -74,6 +82,14 @@ fn setupTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bui
             .optimize = optimize,
         }),
     });
+
+    const yaml_dep = b.dependency("yaml", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const yaml_mod = yaml_dep.module("yaml");
+
+    lib_unit_tests.root_module.addImport("yaml", yaml_mod);
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
