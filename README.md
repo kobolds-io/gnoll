@@ -9,11 +9,14 @@
 
 ## Usage
 
-Using `gnoll` is simple.
+Using `gnoll` is pretty simple.
 
 ```zig
 // import the library into your file
 const gnoll = @import("gnoll");
+const Gnoll = gnoll.Gnoll;
+const ConfigInfo = gnoll.ConfigInfo; // if you like types
+const GnollOptions = gnoll.GnollOptions; // if you like types
 
 // Define your config type
 const TestConfig = struct {
@@ -23,8 +26,6 @@ const TestConfig = struct {
         key_0: []f32,
     },
 };
-
-
 
 fn main() !void {
     // Define some filepaths to check for configuration files

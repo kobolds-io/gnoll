@@ -12,7 +12,7 @@ const ConfigFormat = enum {
     yaml,
 };
 
-const ConfigInfo = struct {
+pub const ConfigInfo = struct {
     filepath: []const u8,
     format: ConfigFormat,
 
