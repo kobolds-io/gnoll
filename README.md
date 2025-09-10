@@ -60,7 +60,7 @@ You can install stdx just like any other zig dependency by editing your `build.z
 ```zig
     .dependencies = .{
         .gnoll = .{
-            .url = "https://github.com/kobolds-io/gnoll/archive/refs/tags/v0.0.3.tar.gz",
+            .url = "https://github.com/kobolds-io/gnoll/archive/refs/tags/v0.0.4.tar.gz",
             .hash = "",
         },
     },
