@@ -21,12 +21,6 @@ pub fn build(b: *std.Build) void {
     setupLibrary(b, target, optimize);
 
     setupTests(b, target, optimize);
-
-    setupDocs(b, target, optimize);
-
-    // setupBenchmarks(b, target, optimize);
-
-    // setupExamples(b, target, optimize);
 }
 
 fn setupLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -49,29 +43,6 @@ fn setupLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     lib.root_module.addImport("yaml", yaml_mod);
 
     b.installArtifact(lib);
-}
-
-fn setupDocs(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
-    const lib = b.addLibrary(.{
-        .name = "gnoll",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/gnoll.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-        .version = version,
-    });
-
-    b.installArtifact(lib);
-
-    const install_docs = b.addInstallDirectory(.{
-        .source_dir = lib.getEmittedDocs(),
-        .install_dir = .prefix,
-        .install_subdir = "docs",
-    });
-
-    const docs_step = b.step("docs", "generate docs");
-    docs_step.dependOn(&install_docs.step);
 }
 
 fn setupTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
