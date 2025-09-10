@@ -45,6 +45,7 @@ fn setupLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     // Explicitly export the `gnoll` module so it can be imported by others
     _ = b.addModule("gnoll", .{
         .root_source_file = b.path("src/gnoll.zig"),
+        .imports = &.{.{ .name = "yaml", .module = yaml_mod }},
         .target = target,
         .optimize = optimize,
     });
