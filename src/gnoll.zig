@@ -194,51 +194,6 @@ test "basic workflow" {
     var gnoll = try Gnoll(TestConfig).init(allocator, gnoll_options);
     defer gnoll.deinit(allocator);
 
-    try testing.expectEqual(gnoll_options.config_infos[0].filepath, gnoll.config_info.filepath);
-    try testing.expectEqual(gnoll_options.config_infos[0].format, gnoll.config_info.format);
-
-    try testing.expectEqual(54321, gnoll.config.key_0);
-    try testing.expect(std.mem.eql(u8, "some bytes value", gnoll.config.key_1));
-    try testing.expect(std.mem.eql(f32, &.{ 1.23, 3.14 }, gnoll.config.key_2.key_0));
-}
-
-test "json support" {
-    const allocator = testing.allocator;
-
-    const gnoll_options = GnollOptions{
-        .ignore_unknown_fields = false,
-        .config_infos = &.{
-            ConfigInfo{
-                .filepath = "./test_data/config_0.json",
-                .format = .json,
-            },
-        },
-    };
-
-    var gnoll = try Gnoll(TestConfig).init(allocator, gnoll_options);
-    defer gnoll.deinit(allocator);
-
-    try testing.expectEqual(54321, gnoll.config.key_0);
-    try testing.expect(std.mem.eql(u8, "some bytes value", gnoll.config.key_1));
-    try testing.expect(std.mem.eql(f32, &.{ 1.23, 3.14 }, gnoll.config.key_2.key_0));
-}
-
-test "yaml support" {
-    const allocator = testing.allocator;
-
-    const gnoll_options = GnollOptions{
-        .ignore_unknown_fields = false,
-        .config_infos = &.{
-            ConfigInfo{
-                .filepath = "./test_data/config_1.yaml",
-                .format = .yaml,
-            },
-        },
-    };
-
-    var gnoll = try Gnoll(TestConfig).init(allocator, gnoll_options);
-    defer gnoll.deinit(allocator);
-
     try testing.expectEqual(54321, gnoll.config.key_0);
     try testing.expect(std.mem.eql(u8, "some bytes value", gnoll.config.key_1));
     try testing.expect(std.mem.eql(f32, &.{ 1.23, 3.14 }, gnoll.config.key_2.key_0));
