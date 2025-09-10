@@ -1,6 +1,6 @@
 .{
     .name = .gnoll,
-    .version = "0.0.0",
+    .version = "0.0.1",
     .fingerprint = 0xf80e59b5f5b87f88, // Changing this has security and trust implications.
     .minimum_zig_version = "0.15.1",
     .dependencies = .{
