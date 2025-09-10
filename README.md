@@ -78,7 +78,7 @@ const gnoll_dep = b.dependency("gnoll", .{
 });
 const gnoll_mod = gnoll_dep.module("gnoll");
 
-exe.root_module.addImport("stdx", stdx_mod);
+exe.root_module.addImport("gnoll", gnoll_mod);
 ```
 
 ## Overview
