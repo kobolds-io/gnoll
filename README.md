@@ -60,7 +60,7 @@ You can install gnoll just like any other zig dependency by editing your `build.
 ```zig
     .dependencies = .{
         .gnoll = .{
-            .url = "https://github.com/kobolds-io/gnoll/archive/refs/tags/v0.0.4.tar.gz",
+            .url = "https://codeberg.org/kobolds-io/gnoll/archive/refs/tags/v0.0.4.tar.gz",
             .hash = "gnoll-0.0.4-iH-49RYtAADDV1u4LoPtRiGmOBy9CTio0qIt4zPJCS8e",
         },
     },
