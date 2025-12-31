@@ -79,6 +79,7 @@ pub fn Gnoll(comptime T: type) type {
         config: T,
         parsed_ptr: *anyopaque,
         source_buf: []u8,
+        arena: ?*std.heap.ArenaAllocator = null,
 
         pub fn init(allocator: std.mem.Allocator, options: GnollOptions) !Self {
             try options.validate();
@@ -130,8 +131,12 @@ pub fn Gnoll(comptime T: type) type {
 
                     try yaml.load(allocator);
 
-                    var arena = std.heap.ArenaAllocator.init(allocator);
-                    defer arena.deinit();
+                    // create an arena that will live for a bit
+                    const arena = try allocator.create(std.heap.ArenaAllocator);
+                    errdefer allocator.destroy(arena);
+
+                    arena.* = std.heap.ArenaAllocator.init(allocator);
+                    errdefer arena.deinit();
 
                     const parsed = try yaml.parse(arena.allocator(), T);
 
@@ -140,6 +145,7 @@ pub fn Gnoll(comptime T: type) type {
                         .parsed_ptr = yaml,
                         .config = parsed,
                         .source_buf = buf,
+                        .arena = arena,
                     };
                 },
             }
@@ -160,6 +166,11 @@ pub fn Gnoll(comptime T: type) type {
 
                     allocator.free(self.source_buf);
                     allocator.destroy(parsed_ptr);
+
+                    if (self.arena) |arena| {
+                        arena.deinit();
+                        allocator.destroy(arena);
+                    }
                 },
             }
         }
