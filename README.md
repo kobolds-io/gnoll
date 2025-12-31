@@ -55,15 +55,10 @@ fn main() !void {
 
 ## Installation
 
-You can install gnoll just like any other zig dependency by editing your `build.zig.zon` file.
+You can install gnoll just like any other zig dependency by editing your `build.zig.zon` file or by using the `zig fetch` command.
 
-```zig
-    .dependencies = .{
-        .gnoll = .{
-            .url = "https://codeberg.org/kobolds-io/gnoll/archive/refs/tags/v0.0.4.tar.gz",
-            .hash = "gnoll-0.0.4-iH-49RYtAADDV1u4LoPtRiGmOBy9CTio0qIt4zPJCS8e",
-        },
-    },
+```bash
+zig fetch --save https://codeberg.org/kobolds-io/gnoll/archive/refs/tags/v0.1.0.tar.gz
 ```
 
 In your `build.zig` file add the library as a dependency.
