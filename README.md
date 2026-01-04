@@ -1,6 +1,6 @@
 # Gnoll
 
-> **CAUTION** this project has been archived. Please see https://codeberg.org/kobolds-io/gnoll. See https://github.com/kobolds-io/kobolds/blob/main/migrating.md for details
+> **CAUTION** this project has been archived. Please see https://gitlab.com/kobolds-io/gnoll. See https://github.com/kobolds-io/kobolds/blob/main/migrating.md for details
 
 `gnoll` is a simple library that helps you load your configs from files. It currently supports the following file formats.
 
