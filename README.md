@@ -7,6 +7,8 @@
 
 `gnoll` is no real substitute for a well thoughtout configuration system but will play nicely with application code.
 
+**Note**: code/issues and all work are hosted at https://gitlab.com/kobolds-io/gnoll
+
 ## Usage
 
 Using `gnoll` is pretty simple.
