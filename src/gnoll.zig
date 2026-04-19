@@ -42,14 +42,13 @@ pub const GnollOptions = struct {
         }
     }
 
-    pub fn getConfigInfo(self: GnollOptions) !ConfigInfo {
+    pub fn getConfigInfo(self: GnollOptions, io: std.Io) !ConfigInfo {
         if (self.config_infos.len == 0) return error.MissingConfigCandidate;
 
-        // for each candidate
         for (self.config_infos) |candidate| {
-            // Check if the file exists
             log.debug("checking path {s}\n", .{candidate.filepath});
-            _ = std.fs.cwd().statFile(candidate.filepath) catch |err| switch (err) {
+
+            _ = std.Io.Dir.cwd().statFile(io, candidate.filepath, .{}) catch |err| switch (err) {
                 error.FileNotFound => {
                     continue;
                 },
@@ -81,24 +80,27 @@ pub fn Gnoll(comptime T: type) type {
         source_buf: []u8,
         arena: ?*std.heap.ArenaAllocator = null,
 
-        pub fn init(allocator: std.mem.Allocator, options: GnollOptions) !Self {
+        pub fn init(allocator: std.mem.Allocator, io: std.Io, options: GnollOptions) !Self {
             try options.validate();
-            const config_info = try options.getConfigInfo();
+            const config_info = try options.getConfigInfo(io);
 
             // read the file
             // figure out if the file exists or return an error
-            const file = try std.fs.cwd().openFile(config_info.filepath, .{});
-            defer file.close();
+            const file = try std.Io.Dir.cwd().openFile(io, config_info.filepath, .{});
+            defer file.close(io);
 
-            const stat = try file.stat();
+            const stat = try file.stat(io);
             const file_size = stat.size;
 
             const buf = try allocator.alloc(u8, file_size);
             errdefer allocator.free(buf);
 
-            const n = try file.readAll(buf);
+            var file_reader = file.reader(io, buf);
+            const reader = &file_reader.interface;
 
-            if (n != file_size) return error.UnexepectedFileReadError;
+            const bytes_read = try reader.take(file_size);
+
+            if (bytes_read.len != file_size) return error.UnexepectedFileReadError;
 
             switch (config_info.format) {
                 .json => {
@@ -123,27 +125,27 @@ pub fn Gnoll(comptime T: type) type {
                     };
                 },
                 .yaml => {
-                    const yaml = try allocator.create(Yaml);
-                    errdefer allocator.destroy(yaml);
-
-                    yaml.* = .{ .source = buf };
-                    errdefer yaml.deinit(allocator);
-
-                    try yaml.load(allocator);
-
-                    // create an arena that will live for a bit
                     const arena = try allocator.create(std.heap.ArenaAllocator);
                     errdefer allocator.destroy(arena);
 
                     arena.* = std.heap.ArenaAllocator.init(allocator);
                     errdefer arena.deinit();
 
-                    const parsed = try yaml.parse(arena.allocator(), T);
+                    var loaded_yaml = try Yaml.load(allocator, buf);
+                    defer loaded_yaml.deinit();
+
+                    const yaml = try loaded_yaml.value.yaml;
+
+                    const parsed_ptr = try allocator.create(Yaml.Managed(T));
+                    errdefer allocator.destroy(parsed_ptr);
+
+                    parsed_ptr.* = try yaml.parse(T, arena.allocator());
+                    errdefer parsed_ptr.deinit();
 
                     return Self{
                         .config_info = config_info,
-                        .parsed_ptr = yaml,
-                        .config = parsed,
+                        .parsed_ptr = parsed_ptr,
+                        .config = parsed_ptr.value,
                         .source_buf = buf,
                         .arena = arena,
                     };
@@ -161,8 +163,8 @@ pub fn Gnoll(comptime T: type) type {
                     allocator.destroy(parsed_ptr);
                 },
                 .yaml => {
-                    const parsed_ptr: *Yaml = @ptrCast(@alignCast(self.parsed_ptr));
-                    parsed_ptr.deinit(allocator);
+                    const parsed_ptr: *Yaml.Managed(T) = @ptrCast(@alignCast(self.parsed_ptr));
+                    parsed_ptr.deinit();
 
                     allocator.free(self.source_buf);
                     allocator.destroy(parsed_ptr);
@@ -185,8 +187,9 @@ const TestConfig = struct {
     },
 };
 
-test "basic workflow" {
+test "basic json workflow" {
     const allocator = testing.allocator;
+    const io = testing.io;
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -195,6 +198,24 @@ test "basic workflow" {
                 .filepath = "./test_data/config_0.json",
                 .format = .json,
             },
+        },
+    };
+
+    var gnoll = try Gnoll(TestConfig).init(allocator, io, gnoll_options);
+    defer gnoll.deinit(allocator);
+
+    try testing.expectEqual(54321, gnoll.config.key_0);
+    try testing.expect(std.mem.eql(u8, "some bytes value", gnoll.config.key_1));
+    try testing.expect(std.mem.eql(f32, &.{ 1.23, 3.14 }, gnoll.config.key_2.key_0));
+}
+
+test "basic yaml workflow" {
+    const allocator = testing.allocator;
+    const io = testing.io;
+
+    const gnoll_options = GnollOptions{
+        .ignore_unknown_fields = false,
+        .config_infos = &.{
             ConfigInfo{
                 .filepath = "./test_data/config_1.yaml",
                 .format = .yaml,
@@ -202,7 +223,7 @@ test "basic workflow" {
         },
     };
 
-    var gnoll = try Gnoll(TestConfig).init(allocator, gnoll_options);
+    var gnoll = try Gnoll(TestConfig).init(allocator, io, gnoll_options);
     defer gnoll.deinit(allocator);
 
     try testing.expectEqual(54321, gnoll.config.key_0);
@@ -212,6 +233,7 @@ test "basic workflow" {
 
 test "error on duplicate config" {
     const allocator = testing.allocator;
+    const io = testing.io;
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -227,22 +249,24 @@ test "error on duplicate config" {
         },
     };
 
-    try testing.expectError(error.DuplicateConfigInfo, Gnoll(TestConfig).init(allocator, gnoll_options));
+    try testing.expectError(error.DuplicateConfigInfo, Gnoll(TestConfig).init(allocator, io, gnoll_options));
 }
 
 test "error no config info" {
     const allocator = testing.allocator;
+    const io = testing.io;
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
         .config_infos = &.{},
     };
 
-    try testing.expectError(error.MissingConfigInfo, Gnoll(TestConfig).init(allocator, gnoll_options));
+    try testing.expectError(error.MissingConfigInfo, Gnoll(TestConfig).init(allocator, io, gnoll_options));
 }
 
 test "file not found" {
     const allocator = testing.allocator;
+    const io = testing.io;
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -254,11 +278,12 @@ test "file not found" {
         },
     };
 
-    try testing.expectError(error.NoEligibleConfigInfoFound, Gnoll(TestConfig).init(allocator, gnoll_options));
+    try testing.expectError(error.NoEligibleConfigInfoFound, Gnoll(TestConfig).init(allocator, io, gnoll_options));
 }
 
 test "file parse error" {
     const allocator = testing.allocator;
+    const io = testing.io;
 
     const gnoll_options = GnollOptions{
         .ignore_unknown_fields = false,
@@ -270,5 +295,5 @@ test "file parse error" {
         },
     };
 
-    try testing.expectError(error.SyntaxError, Gnoll(TestConfig).init(allocator, gnoll_options));
+    try testing.expectError(error.SyntaxError, Gnoll(TestConfig).init(allocator, io, gnoll_options));
 }
