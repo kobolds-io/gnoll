@@ -27,7 +27,9 @@ const TestConfig = struct {
     },
 };
 
-fn main() !void {
+fn main(init: std.process.Init) !void {
+    const io = init.io;
+
     // Define some filepaths to check for configuration files
     const gnoll_options = GnollOptions{
         .config_infos = &.{
@@ -44,7 +46,7 @@ fn main() !void {
     };
 
     // Initialize Gnoll with your config Type
-    var gnoll = try Gnoll(TestConfig).init(allocator, gnoll_options);
+    var gnoll = try Gnoll(TestConfig).init(allocator, io, gnoll_options);
     defer gnoll.deinit(allocator);
 
     // get values from `gnoll` after initialization
@@ -64,7 +66,7 @@ fn main() !void {
 You can install gnoll just like any other zig dependency by editing your `build.zig.zon` file or by using the `zig fetch` command.
 
 ```bash
-zig fetch --save https://gitlab.com/kobolds-io/gnoll/-/archive/v0.1.0/gnoll-v0.1.0.tar.gz
+zig fetch --save https://gitlab.com/kobolds-io/gnoll/-/archive/v0.2.0/gnoll-v0.2.0.tar.gz
 ```
 
 In your `build.zig` file add the library as a dependency.
