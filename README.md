@@ -55,6 +55,12 @@ fn main() !void {
 
 ## Installation
 
+| zig version | stdx version |
+|-------------|--------------|
+| 0.15.x      | 0.1.0        |
+| 0.16.0      | 0.2.0        |
+
+
 You can install gnoll just like any other zig dependency by editing your `build.zig.zon` file or by using the `zig fetch` command.
 
 ```bash
