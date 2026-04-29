@@ -62,13 +62,13 @@ fn main(init: std.process.Init) !void {
 | zig version | stdx version |
 |-------------|--------------|
 | 0.15.x      | 0.1.0        |
-| 0.16.0      | 0.2.0        |
+| 0.16.0      | 0.2.x        |
 
 
 You can install gnoll just like any other zig dependency by editing your `build.zig.zon` file or by using the `zig fetch` command.
 
 ```bash
-zig fetch --save https://gitlab.com/kobolds-io/gnoll/-/archive/v0.2.0/gnoll-v0.2.0.tar.gz
+zig fetch --save https://gitlab.com/kobolds-io/gnoll/-/archive/v0.2.1/gnoll-v0.2.1.tar.gz
 ```
 
 In your `build.zig` file add the library as a dependency.
